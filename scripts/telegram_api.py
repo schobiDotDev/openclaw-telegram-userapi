@@ -173,7 +173,12 @@ async def cmd_create_group(title, bot_username=None):
                 return
 
         result = await client(CreateChatRequest(users=users, title=title))
-        chat = result.chats[0]
+        # Telethon >=1.37: result is InvitedUsers with .updates.chats
+        # Telethon <1.37: result is Updates with .chats directly
+        if hasattr(result, "chats"):
+            chat = result.chats[0]
+        else:
+            chat = result.updates.chats[0]
 
         output({
             "ok": True,
@@ -423,16 +428,16 @@ def main():
 
     # Parse --flag arguments
     positional = []
-    flags = dict(defaults)
+    explicit_flags = {}
     i = 0
     while i < len(args):
         if args[i].startswith("--") and "=" in args[i]:
             key, val = args[i][2:].split("=", 1)
-            flags[key.replace("-", "_")] = val
+            explicit_flags[key.replace("-", "_")] = val
             i += 1
         elif args[i].startswith("--") and i + 1 < len(args):
             key = args[i][2:].replace("-", "_")
-            flags[key] = args[i + 1]
+            explicit_flags[key] = args[i + 1]
             i += 2
         else:
             positional.append(args[i])
@@ -444,8 +449,8 @@ def main():
         output({"ok": False, "error": f"Missing required arguments: {', '.join(missing)}"})
         sys.exit(1)
 
-    # Build kwargs
-    kwargs = {}
+    # Build kwargs: defaults first, then positional, then explicit flags
+    kwargs = dict(defaults)
     for idx, name in enumerate(required):
         if idx < len(positional):
             kwargs[name] = positional[idx]
@@ -454,10 +459,8 @@ def main():
     for idx, val in enumerate(positional[len(required):]):
         if idx < len(optional_names):
             kwargs[optional_names[idx]] = val
-    # Flag overrides
-    for k, v in flags.items():
-        if k in defaults or k in required:
-            kwargs[k] = v
+    # Explicit --flag overrides (only flags the user actually passed)
+    kwargs.update(explicit_flags)
 
     # Convert types
     if "limit" in kwargs:
