@@ -1,0 +1,18 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Session data
+data/
+*.session
+*.session-journal
+
+# Credentials
+.env
+telegram.env
+
+# OS
+.DS_Store
+Thumbs.db
